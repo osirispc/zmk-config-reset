@@ -1,10 +1,8 @@
-name: ZMK Firmware Build
+name: Build ZMK firmware
 
 on:
   push:
-    branches:
-      - main
-      - factory-reset
+    branches: [ factory-reset ]
   workflow_dispatch:
 
 jobs:
@@ -23,25 +21,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Cache west modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            zephyr
-            modules
-            .west
-          key: ${{ runner.os }}-zmk-${{ hashFiles('**/west.yml') }}
-
-      - name: Initialize west
-        run: |
-          pip install west
-          west init -l .
-          west update
+      - name: Initialize ZMK
+        uses: zmkfirmware/setup-zmk@v1
 
       - name: Build firmware
         run: |
-          west build -s zmk/app -b ${{ matrix.board }} \
-            -- -DSHIELD=${{ matrix.shield }}
+          west build -b ${{ matrix.board }} -- -DSHIELD=${{ matrix.shield }}
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
