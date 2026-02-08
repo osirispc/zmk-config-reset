@@ -1,4 +1,4 @@
-name: Build ZMK firmware
+name: Build ZMK firmware (factory reset)
 
 on:
   push:
@@ -18,18 +18,47 @@ jobs:
             shield: corne_right
 
     steps:
-      - name: Checkout
+      - name: Checkout config repo
         uses: actions/checkout@v4
 
-      - name: Initialize ZMK
-        uses: zmkfirmware/setup-zmk@v1
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install west
+        run: |
+          python -m pip install --upgrade pip
+          pip install west
+
+      - name: Init west workspace (ZMK upstream manifest app/west.yml)
+        run: |
+          rm -rf /tmp/zmk-work
+          mkdir -p /tmp/zmk-work
+          cd /tmp/zmk-work
+
+          # ZMK's west manifest is in app/west.yml
+          west init -m https://github.com/zmkfirmware/zmk.git --mr main --mf app/west.yml .
+          west update
+          west zephyr-export
+
+          # Proof-of-life
+          ls -la
+          ls -la zmk || true
+          ls -la app || true
 
       - name: Build firmware
         run: |
-          west build -b ${{ matrix.board }} -- -DSHIELD=${{ matrix.shield }}
+          cd /tmp/zmk-work
+
+          west build -s app -b ${{ matrix.board }} -- \
+            -DSHIELD=${{ matrix.shield }} \
+            -DZMK_CONFIG=${{ github.workspace }}/config
+
+          cp build/zephyr/zmk.uf2 ${{ github.workspace }}/${{ matrix.shield }}-${{ matrix.board }}.uf2
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
-          name: firmware-${{ matrix.shield }}
-          path: build/zephyr/zmk.uf2
+          name: factory-${{ matrix.shield }}-${{ matrix.board }}
+          path: ${{ matrix.shield }}-${{ matrix.board }}.uf2
